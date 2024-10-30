@@ -1,9 +1,7 @@
 package org.example._citizenproj2.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -12,7 +10,9 @@ import java.util.Date;
 
 @Entity
 @Table(name = "city_movies")
-@Data
+@Data  // 已有，但確保存在
+@Getter // 明確添加
+@Setter // 明確添加
 @NoArgsConstructor
 @AllArgsConstructor
 public class Movie {

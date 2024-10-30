@@ -2,7 +2,9 @@ package org.example._citizenproj2.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.BookingRequest;
+import org.example._citizenproj2.dto.request.GroupBookingRequest;
 import org.example._citizenproj2.dto.response.BookingResponse;
+import org.example._citizenproj2.exception.SeatNotAvailableException;
 import org.example._citizenproj2.service.BookingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
