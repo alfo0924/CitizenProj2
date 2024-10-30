@@ -22,23 +22,8 @@ public class TransferRequest {
     @DecimalMax(value = "100000.00", message = "單筆轉帳不能超過100000")
     private BigDecimal amount;
 
+    @Size(max = 500, message = "備註長度不能超過500")
     private String note;
+
     private String verificationCode;
-    private String deviceInfo;
-    private String ipAddress;
-
-    @Builder.Default
-    private TransferType transferType = TransferType.NORMAL;
-
-    @Builder.Default
-    private Boolean isRecurring = false;
-
-    private String scheduledTime;
-    private String recurringPattern;
-
-    public enum TransferType {
-        NORMAL,    // 一般轉帳
-        EXPRESS,   // 即時轉帳
-        SCHEDULED  // 預約轉帳
-    }
 }

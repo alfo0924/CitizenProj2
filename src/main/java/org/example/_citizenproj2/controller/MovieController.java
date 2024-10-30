@@ -6,9 +6,11 @@ import org.example._citizenproj2.dto.request.RatingRequest;
 import org.example._citizenproj2.dto.response.MovieResponse;
 import org.example._citizenproj2.dto.response.CategoryResponse;
 import org.example._citizenproj2.dto.response.RatingResponse;
+import org.example._citizenproj2.exception.MovieNotFoundException;
 import org.example._citizenproj2.service.MovieService;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/movies")

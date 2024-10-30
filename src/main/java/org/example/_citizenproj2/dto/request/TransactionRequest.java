@@ -31,18 +31,30 @@ public class TransactionRequest {
     @Size(min = 6, max = 6, message = "驗證碼必須是6位")
     private String verificationCode;
 
-    // 用於安全驗證
-    private String deviceInfo;
-    private String ipAddress;
+    @Builder.Default
+    private Boolean needVerification = false;
 
     // 用於大額交易
-    private Boolean needVerification;
     private String verificationMethod;
+
+    // 交易相關資訊
+    private String deviceInfo;
+    private String ipAddress;
 
     // 驗證方法
     public void validateTransaction() {
         if (amount.compareTo(new BigDecimal("50000")) > 0 && verificationCode == null) {
             throw new IllegalArgumentException("大額交易需要驗證碼");
         }
+    }
+
+    // 檢查是否需要驗證
+    public boolean needsVerification() {
+        return amount.compareTo(new BigDecimal("10000")) > 0 || Boolean.TRUE.equals(needVerification);
+    }
+
+    // 取得交易來源資訊
+    public String getTransactionSource() {
+        return String.format("IP: %s, Device: %s", ipAddress, deviceInfo);
     }
 }

@@ -66,4 +66,7 @@ public class MemberRequest {
             throw new IllegalArgumentException("新密碼長度必須在6-20之間");
         }
     }
+
+    public class Login {
+    }
 }

@@ -15,9 +15,10 @@ import java.util.Map;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
+    // 修改返回類型為 Page<Transaction>
+    Page<Transaction> findByWalletWalletId(Long walletId, Pageable pageable);
 
-    // 基本查詢
-    List<Transaction> findByWalletWalletId(Long walletId, Pageable pageable);
+
 
     List<Transaction> findByTransactionType(Transaction.TransactionType type);
 
@@ -34,12 +35,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             "t.transactionType as type, " +
             "COUNT(t) as count, " +
             "SUM(t.amount) as totalAmount) " +
-            "FROM Transaction t " +
-            "WHERE t.wallet.walletId = :walletId " +
+            "FROM Wallet w JOIN w.transactions t " +
+            "WHERE w.walletId = :walletId " +
             "AND t.status = 'COMPLETED' " +
             "GROUP BY t.transactionType")
     List<Map<String, Object>> getTransactionStatistics(@Param("walletId") Long walletId);
-
     // 餘額查詢
     @Query("SELECT SUM(t.amount) FROM Transaction t " +
             "WHERE t.wallet.walletId = :walletId " +

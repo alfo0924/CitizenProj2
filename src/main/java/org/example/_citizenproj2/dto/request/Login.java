@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 public class Login {
 
     @NotBlank(message = "帳號不能為空")
-    private String username; // 可以是 email 或 phone
+    private String username;
 
     @NotBlank(message = "密碼不能為空")
     private String password;
@@ -22,8 +22,6 @@ public class Login {
     private Boolean rememberMe = false;
 
     private String verificationCode;
-
-    // 用於記錄登入資訊
     private String deviceInfo;
     private String ipAddress;
     private String userAgent;

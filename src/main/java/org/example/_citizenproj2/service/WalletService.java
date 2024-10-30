@@ -2,6 +2,7 @@ package org.example._citizenproj2.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.TransactionRequest;
+import org.example._citizenproj2.dto.request.TransferRequest;
 import org.example._citizenproj2.dto.response.TransactionResponse;
 import org.example._citizenproj2.dto.response.WalletResponse;
 import org.example._citizenproj2.exception.InsufficientBalanceException;
@@ -10,23 +11,45 @@ import org.example._citizenproj2.model.Transaction;
 import org.example._citizenproj2.model.Wallet;
 import org.example._citizenproj2.repository.TransactionRepository;
 import org.example._citizenproj2.repository.WalletRepository;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class WalletService {
 
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public WalletResponse createWallet(Long memberId) {
+        if (walletRepository.existsByMemberMemberId(memberId)) {
+            throw new WalletException("錢包已存在");
+        }
+
+        Wallet wallet = new Wallet();
+        wallet.setMemberMemberId(memberId);
+        wallet.setBalance(BigDecimal.ZERO);
+        wallet.setTotalDeposit(BigDecimal.ZERO);
+        wallet.setTotalSpent(BigDecimal.ZERO);
+        wallet.setWalletStatus(Wallet.WalletStatus.ACTIVE);
+
+        return convertToWalletResponse(walletRepository.save(wallet));
+    }
+
     public WalletResponse getWalletByMemberId(Long memberId) {
         Wallet wallet = walletRepository.findByMemberMemberId(memberId)
                 .orElseThrow(() -> new WalletException("錢包不存在"));
@@ -37,6 +60,7 @@ public class WalletService {
     public TransactionResponse deposit(Long walletId, TransactionRequest request) {
         Wallet wallet = getWalletById(walletId);
         validateWalletStatus(wallet);
+        validateDepositAmount(request.getAmount());
 
         Transaction transaction = createTransaction(
                 wallet,
@@ -45,7 +69,10 @@ public class WalletService {
                 request.getDescription()
         );
 
-        updateWalletBalance(wallet, request.getAmount());
+        wallet.setBalance(wallet.getBalance().add(request.getAmount()));
+        wallet.setTotalDeposit(wallet.getTotalDeposit().add(request.getAmount()));
+        wallet.setLastTransactionTime(LocalDateTime.now());
+        walletRepository.save(wallet);
 
         return convertToTransactionResponse(transactionRepository.save(transaction));
     }
@@ -54,7 +81,7 @@ public class WalletService {
     public TransactionResponse withdraw(Long walletId, TransactionRequest request) {
         Wallet wallet = getWalletById(walletId);
         validateWalletStatus(wallet);
-        validateBalance(wallet, request.getAmount());
+        validateWithdrawalAmount(wallet, request.getAmount());
 
         Transaction transaction = createTransaction(
                 wallet,
@@ -63,31 +90,12 @@ public class WalletService {
                 request.getDescription()
         );
 
-        updateWalletBalance(wallet, request.getAmount().negate());
+        wallet.setBalance(wallet.getBalance().subtract(request.getAmount()));
+        wallet.setTotalSpent(wallet.getTotalSpent().add(request.getAmount()));
+        wallet.setLastTransactionTime(LocalDateTime.now());
+        walletRepository.save(wallet);
 
         return convertToTransactionResponse(transactionRepository.save(transaction));
-    }
-
-    @Transactional(readOnly = true)
-    public List<TransactionResponse> getTransactions(Long walletId, int page, int size) {
-        return transactionRepository.findByWalletWalletId(walletId, PageRequest.of(page, size))
-                .stream()
-                .map(this::convertToTransactionResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public BigDecimal getBalance(Long walletId) {
-        return walletRepository.findById(walletId)
-                .map(Wallet::getBalance)
-                .orElseThrow(() -> new WalletException("錢包不存在"));
-    }
-
-    @Transactional
-    public boolean hasEnoughBalance(Long memberId, BigDecimal amount) {
-        return walletRepository.findByMemberMemberId(memberId)
-                .map(wallet -> wallet.getBalance().compareTo(amount) >= 0)
-                .orElse(false);
     }
 
     @Transactional
@@ -106,7 +114,10 @@ public class WalletService {
         );
         transaction.setReferenceId(referenceId);
 
-        updateWalletBalance(wallet, amount.negate());
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        wallet.setTotalSpent(wallet.getTotalSpent().add(amount));
+        wallet.setLastTransactionTime(LocalDateTime.now());
+        walletRepository.save(wallet);
 
         return convertToTransactionResponse(transactionRepository.save(transaction));
     }
@@ -124,9 +135,26 @@ public class WalletService {
         );
         transaction.setReferenceId(referenceId);
 
-        updateWalletBalance(wallet, amount);
+        wallet.setBalance(wallet.getBalance().add(amount));
+        wallet.setLastTransactionTime(LocalDateTime.now());
+        walletRepository.save(wallet);
 
         return convertToTransactionResponse(transactionRepository.save(transaction));
+    }
+
+    public Page<TransactionResponse> getTransactionHistory(Long walletId, Pageable pageable) {
+        return transactionRepository.findByWalletWalletId(walletId, pageable)
+                .map(this::convertToTransactionResponse);
+    }
+
+    public Map<String, Object> getWalletStatistics(Long walletId) {
+        return (Map<String, Object>) transactionRepository.getTransactionStatistics(walletId);
+    }
+
+    public boolean hasEnoughBalance(Long memberId, BigDecimal amount) {
+        return walletRepository.findByMemberMemberId(memberId)
+                .map(wallet -> wallet.getBalance().compareTo(amount) >= 0)
+                .orElse(false);
     }
 
     private Wallet getWalletById(Long walletId) {
@@ -142,8 +170,27 @@ public class WalletService {
 
     private void validateBalance(Wallet wallet, BigDecimal amount) {
         if (wallet.getBalance().compareTo(amount) < 0) {
-            throw new InsufficientBalanceException("餘額不足");
+            throw new InsufficientBalanceException(wallet.getBalance(), amount);
         }
+    }
+
+    private void validateDepositAmount(BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new WalletException("存款金額必須大於0");
+        }
+        if (amount.compareTo(new BigDecimal("100000")) > 0) {
+            throw new WalletException("單筆存款不能超過100000");
+        }
+    }
+
+    private void validateWithdrawalAmount(Wallet wallet, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new WalletException("提款金額必須大於0");
+        }
+        if (amount.compareTo(new BigDecimal("50000")) > 0) {
+            throw new WalletException("單筆提款不能超過50000");
+        }
+        validateBalance(wallet, amount);
     }
 
     private Transaction createTransaction(
@@ -153,7 +200,7 @@ public class WalletService {
             String description) {
 
         Transaction transaction = new Transaction();
-        transaction.setTransactionId(generateTransactionId());
+        transaction.setTransactionId("TXN" + UUID.randomUUID().toString().substring(0, 8));
         transaction.setWallet(wallet);
         transaction.setAmount(amount);
         transaction.setBalance(wallet.getBalance().add(amount));
@@ -165,21 +212,13 @@ public class WalletService {
         return transaction;
     }
 
-    private void updateWalletBalance(Wallet wallet, BigDecimal amount) {
-        wallet.setBalance(wallet.getBalance().add(amount));
-        wallet.setLastTransactionTime(LocalDateTime.now());
-        walletRepository.save(wallet);
-    }
-
-    private String generateTransactionId() {
-        return "TXN" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
-
     private WalletResponse convertToWalletResponse(Wallet wallet) {
         return WalletResponse.builder()
                 .walletId(wallet.getWalletId())
                 .memberId(wallet.getMember().getMemberId())
                 .balance(wallet.getBalance())
+                .totalDeposit(wallet.getTotalDeposit())
+                .totalSpent(wallet.getTotalSpent())
                 .walletStatus(wallet.getWalletStatus().toString())
                 .lastTransactionTime(wallet.getLastTransactionTime())
                 .build();
@@ -197,5 +236,73 @@ public class WalletService {
                 .description(transaction.getDescription())
                 .referenceId(transaction.getReferenceId())
                 .build();
+    }
+    public BigDecimal getBalance(Long walletId) {
+        Wallet wallet = getWalletById(walletId);
+        return wallet.getBalance();
+    }
+
+    @Transactional
+    public TransactionResponse transfer(Long walletId, TransferRequest request) {
+        Wallet senderWallet = getWalletById(walletId);
+        Wallet receiverWallet = walletRepository.findByMemberMemberId(request.getReceiverMemberId())
+                .orElseThrow(() -> new WalletException("收款方錢包不存在"));
+
+        validateWalletStatus(senderWallet);
+        validateWalletStatus(receiverWallet);
+        validateBalance(senderWallet, request.getAmount());
+
+        // 建立轉出交易
+        Transaction senderTransaction = createTransaction(
+                senderWallet,
+                request.getAmount().negate(),
+                Transaction.TransactionType.TRANSFER_OUT,
+                "轉帳給 " + receiverWallet.getMember().getEmail()
+        );
+
+        // 建立轉入交易
+        Transaction receiverTransaction = createTransaction(
+                receiverWallet,
+                request.getAmount(),
+                Transaction.TransactionType.TRANSFER_IN,
+                "來自 " + senderWallet.getMember().getEmail() + " 的轉帳"
+        );
+
+        // 更新雙方餘額
+        senderWallet.setBalance(senderWallet.getBalance().subtract(request.getAmount()));
+        receiverWallet.setBalance(receiverWallet.getBalance().add(request.getAmount()));
+
+        walletRepository.save(senderWallet);
+        walletRepository.save(receiverWallet);
+        transactionRepository.save(receiverTransaction);
+
+        return convertToTransactionResponse(transactionRepository.save(senderTransaction));
+    }
+
+    @Transactional
+    public WalletResponse updateWalletStatus(Long walletId, String status) {
+        Wallet wallet = getWalletById(walletId);
+        wallet.setWalletStatus(Wallet.WalletStatus.valueOf(status.toUpperCase()));
+        return convertToWalletResponse(walletRepository.save(wallet));
+    }
+
+    public List<TransactionResponse> getStatement(Long walletId, String startDate, String endDate) {
+        LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+        LocalDateTime end = LocalDate.parse(endDate).atTime(23, 59, 59);
+
+        return transactionRepository.findByWalletWalletIdAndTransactionTimeBetween(
+                        walletId, start, end)
+                .stream()
+                .map(this::convertToTransactionResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<TransactionResponse> getTransactions(Long walletId, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("transactionTime").descending());
+        return transactionRepository.findByWalletWalletId(walletId, pageRequest)
+                .getContent()
+                .stream()
+                .map(this::convertToTransactionResponse)
+                .collect(Collectors.toList());
     }
 }

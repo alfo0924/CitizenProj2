@@ -27,8 +27,6 @@ public class PasswordReset {
     private String userAgent;
 
     public enum ResetMethod {
-        EMAIL,      // 通過電子郵件重設
-        SMS,        // 通過簡訊重設
-        BOTH        // 同時使用電子郵件和簡訊
+        EMAIL, SMS, BOTH
     }
 }
