@@ -8,7 +8,9 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -43,7 +45,7 @@ public class Member {
     @Column(length = 50)
     private String lastName;
 
-    private Date birthday;
+
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
@@ -60,6 +62,14 @@ public class Member {
 
     private String passwordResetToken;
     private LocalDateTime passwordResetExpiry;
+
+
+    // 添加年齡相關字段
+    @Column(nullable = false)
+    private LocalDate birthday;
+    private String studentId;  // 學生證號
+    private String seniorId;   // 敬老證號
+    private Boolean isVipMember = false;
 
     @CreationTimestamp
     private LocalDateTime registerDate;
@@ -181,5 +191,25 @@ public class Member {
             isVerified = false;
         }
         lastPasswordChange = LocalDateTime.now();
+    }
+    // 票種資格判斷方法
+    public boolean isChildTicketEligible() {
+        if (birthday == null) return false;
+        int age = Period.between(birthday, LocalDate.now()).getYears();
+        return age <= 12;
+    }
+
+    public boolean isSeniorTicketEligible() {
+        if (birthday == null) return false;
+        int age = Period.between(birthday, LocalDate.now()).getYears();
+        return age >= 65 || seniorId != null;
+    }
+
+    public boolean isStudentTicketEligible() {
+        return studentId != null;
+    }
+
+    public boolean isVipSeatEligible() {
+        return isVipMember;
     }
 }

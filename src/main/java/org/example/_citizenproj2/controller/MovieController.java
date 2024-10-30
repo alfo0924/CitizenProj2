@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.MovieRequest;
 import org.example._citizenproj2.dto.request.RatingRequest;
 import org.example._citizenproj2.dto.response.MovieResponse;
-import org.example._citizenproj2.dto.response.CategoryResponse;
 import org.example._citizenproj2.dto.response.RatingResponse;
 import org.example._citizenproj2.exception.MovieNotFoundException;
 import org.example._citizenproj2.model.Movie;
@@ -88,7 +87,7 @@ public class MovieController {
     }
 
     @GetMapping("/categories")
-    public ResponseEntity<Page<CategoryResponse>> getAllCategories(
+    public Object getAllCategories(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(movieService.getMovieCategories(PageRequest.of(page, size)));

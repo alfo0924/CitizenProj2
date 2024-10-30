@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.example._citizenproj2.model.Member;
 
+import java.time.LocalDate;
 import java.util.Date;
 
 @Data
@@ -34,7 +35,7 @@ public class MemberRequest {
     private String lastName;
 
     @Past(message = "生日必須是過去的日期")
-    private Date birthday;
+    private LocalDate birthday;  // 改用 LocalDate
 
     @NotNull(message = "性別不能為空")
     private Member.Gender gender;

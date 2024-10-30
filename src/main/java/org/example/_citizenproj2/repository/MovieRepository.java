@@ -25,6 +25,9 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
 
     boolean existsByMovieName(String movieName);
 
+    // 狀態計數
+    long countByMovieStatus(Movie.MovieStatus status);
+
     // 複合查詢
     @Query("SELECT m FROM Movie m WHERE m.movieStatus = 'SHOWING' " +
             "AND m.releaseDate <= CURRENT_DATE")
@@ -123,4 +126,37 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
             @Param("status") Movie.MovieStatus status,
             @Param("sortBy") String sortBy,
             Pageable pageable);
+
+    // 評論相關查詢
+    @Query("SELECT m FROM Movie m LEFT JOIN FETCH m.comments " +
+            "WHERE m.movieId = :movieId")
+    Optional<Movie> findMovieWithComments(@Param("movieId") Long movieId);
+
+    @Query("SELECT COUNT(c) FROM Movie m JOIN m.comments c " +
+            "WHERE m.movieId = :movieId")
+    long getCommentCount(@Param("movieId") Long movieId);
+
+    // 修改評論相關查詢為評分相關查詢
+    @Query("SELECT m FROM Movie m LEFT JOIN FETCH m.ratings " +
+            "WHERE m.movieId = :movieId")
+    Optional<Movie> findMovieWithRatings(@Param("movieId") Long movieId);
+
+    @Query("SELECT COUNT(r) FROM Movie m JOIN m.ratings r " +
+            "WHERE m.movieId = :movieId")
+    long getRatingCount(@Param("movieId") Long movieId);
+
+    // 添加評分統計相關查詢
+    @Query("SELECT AVG(r.rating) FROM Movie m JOIN m.ratings r " +
+            "WHERE m.movieId = :movieId")
+    Double getAverageRating(@Param("movieId") Long movieId);
+
+    @Query("SELECT new map(" +
+            "r.rating as score, " +
+            "COUNT(r) as count) " +
+            "FROM Movie m JOIN m.ratings r " +
+            "WHERE m.movieId = :movieId " +
+            "GROUP BY r.rating " +
+            "ORDER BY r.rating DESC")
+    List<java.util.Map<String, Object>> getRatingDistribution(@Param("movieId") Long movieId);
+
 }

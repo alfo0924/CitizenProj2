@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.example._citizenproj2.model.Movie;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
@@ -46,6 +47,12 @@ public class MovieResponse {
         private Date nextShowingTime;
         private Double lowestPrice;
         private Double highestPrice;
+        private Long showingId;
+        private LocalDateTime showTime;
+        private String venueName;
+        private Integer availableSeats;
+        private BigDecimal basePrice;
+        private String status;
     }
 
     @Data

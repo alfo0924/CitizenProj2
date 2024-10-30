@@ -1,7 +1,10 @@
 package org.example._citizenproj2.service;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.MovieRequest;
+import org.example._citizenproj2.dto.request.RatingRequest;
+import org.example._citizenproj2.dto.response.CategoryResponse;
 import org.example._citizenproj2.dto.response.MovieResponse;
 import org.example._citizenproj2.dto.response.RatingResponse;
 import org.example._citizenproj2.exception.MovieNotFoundException;
@@ -10,9 +13,7 @@ import org.example._citizenproj2.model.MovieCategory;
 import org.example._citizenproj2.repository.MovieCategoryRepository;
 import org.example._citizenproj2.repository.MovieRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -205,7 +206,7 @@ public class MovieService {
     }
 
     @Transactional
-    public RatingResponse addMovieRating(Long movieId, RatingRequest request) {
+    public RatingResponse addMovieRating(Long movieId, @Valid RatingRequest request) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + movieId + " 的電影"));
 

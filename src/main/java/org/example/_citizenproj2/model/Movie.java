@@ -6,7 +6,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Table(name = "city_movies")
@@ -44,7 +46,13 @@ public class Movie {
     private String subtitle;
     private String posterUrl;
     private String trailerUrl;
+    @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL)
+    private List<Showing> showings = new ArrayList<>();
 
+    // getter and setter
+    public List<Showing> getShowings() {
+        return showings;
+    }
     @ManyToOne
     @JoinColumn(name = "category_id")
     private MovieCategory category;

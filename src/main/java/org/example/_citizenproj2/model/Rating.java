@@ -24,25 +24,27 @@ public class Rating {
     @JoinColumn(name = "movie_id", nullable = false)
     private Movie movie;
 
-    @ManyToOne
-    @JoinColumn(name = "member_id", nullable = false)
-    private Member member;
 
-    @Column(nullable = false, precision = 2, scale = 1)
+    @Column(nullable = false)
     private BigDecimal rating;
 
     @Column(columnDefinition = "TEXT")
     private String comment;
 
-    private Boolean isVerified = false;
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
 
+    @Column(nullable = false)
     private Boolean isVisible = true;
+    @ManyToOne
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    private Boolean isVerified = false;
 
     @Enumerated(EnumType.STRING)
     private RatingStatus status = RatingStatus.ACTIVE;
 
-    @CreationTimestamp
-    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;

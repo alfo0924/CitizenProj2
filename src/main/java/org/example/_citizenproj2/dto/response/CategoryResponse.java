@@ -55,5 +55,10 @@ public class CategoryResponse {
         private Double rating;
         private Integer bookingCount;
         private Boolean isShowing;
+        private Long categoryId;
+        private String categoryName;
+        private String description;
+        private Boolean isActive;
+        private Integer displayOrder;
     }
 }

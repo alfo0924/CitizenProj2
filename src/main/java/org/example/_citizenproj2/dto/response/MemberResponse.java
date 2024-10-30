@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.example._citizenproj2.model.Member;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
 
@@ -19,7 +20,7 @@ public class MemberResponse {
     private String phone;
     private String firstName;
     private String lastName;
-    private Date birthday;
+    private LocalDate birthday;  // 改用 LocalDate
     private Member.Gender gender;
     private String address;
     private Member.Role role;
