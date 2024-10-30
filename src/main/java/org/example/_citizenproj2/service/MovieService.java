@@ -9,16 +9,19 @@ import org.example._citizenproj2.model.MovieCategory;
 import org.example._citizenproj2.repository.MovieCategoryRepository;
 import org.example._citizenproj2.repository.MovieRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class MovieService {
 
     private final MovieRepository movieRepository;
@@ -27,7 +30,7 @@ public class MovieService {
     @Transactional
     public MovieResponse createMovie(MovieRequest request) {
         MovieCategory category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid category ID"));
+                .orElseThrow(() -> new IllegalArgumentException("無效的電影類別ID"));
 
         Movie movie = new Movie();
         movie.setMovieName(request.getMovieName());
@@ -50,20 +53,19 @@ public class MovieService {
         return convertToResponse(savedMovie);
     }
 
-    @Transactional(readOnly = true)
     public MovieResponse getMovie(Long id) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new MovieNotFoundException("Movie not found with id: " + id));
+                .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + id + " 的電影"));
         return convertToResponse(movie);
     }
 
     @Transactional
     public MovieResponse updateMovie(Long id, MovieRequest request) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new MovieNotFoundException("Movie not found with id: " + id));
+                .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + id + " 的電影"));
 
         MovieCategory category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid category ID"));
+                .orElseThrow(() -> new IllegalArgumentException("無效的電影類別ID"));
 
         movie.setMovieName(request.getMovieName());
         movie.setOriginalName(request.getOriginalName());
@@ -87,26 +89,21 @@ public class MovieService {
     @Transactional
     public void deleteMovie(Long id) {
         if (!movieRepository.existsById(id)) {
-            throw new MovieNotFoundException("Movie not found with id: " + id);
+            throw new MovieNotFoundException("找不到ID為 " + id + " 的電影");
         }
         movieRepository.deleteById(id);
     }
 
-    @Transactional(readOnly = true)
-    public List<MovieResponse> getCurrentlyShowingMovies() {
-        return movieRepository.findCurrentlyShowingMovies().stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
+    public Page<MovieResponse> getCurrentlyShowingMovies(Pageable pageable) {
+        return movieRepository.findCurrentlyShowingMovies(pageable)
+                .map(this::convertToResponse);
     }
 
-    @Transactional(readOnly = true)
-    public List<MovieResponse> getUpcomingMovies() {
-        return movieRepository.findUpcomingMovies().stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
+    public Page<MovieResponse> getUpcomingMovies(Pageable pageable) {
+        return movieRepository.findUpcomingMovies(pageable)
+                .map(this::convertToResponse);
     }
 
-    @Transactional(readOnly = true)
     public Page<MovieResponse> searchMovies(String name, String director,
                                             Movie.MovieStatus status, Long categoryId,
                                             Pageable pageable) {
@@ -115,11 +112,39 @@ public class MovieService {
     }
 
     @Transactional
-    public void updateMovieStatus(Long id, Movie.MovieStatus status) {
+    public MovieResponse updateMovieStatus(Long id, Movie.MovieStatus status) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new MovieNotFoundException("Movie not found with id: " + id));
+                .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + id + " 的電影"));
         movie.setMovieStatus(status);
-        movieRepository.save(movie);
+        return convertToResponse(movieRepository.save(movie));
+    }
+
+    public Page<MovieResponse> getMoviesByCategory(Long categoryId, Pageable pageable) {
+        return movieRepository.findMoviesByCategory(categoryId, pageable)
+                .map(this::convertToResponse);
+    }
+
+    public Page<MovieResponse> getPopularMovies(Pageable pageable) {
+        return movieRepository.findPopularMovies(pageable)
+                .map(this::convertToResponse);
+    }
+
+    public Page<MovieResponse> getHighlyRatedMovies(double minRating, Pageable pageable) {
+        return movieRepository.findHighlyRatedMovies(minRating, pageable)
+                .map(this::convertToResponse);
+    }
+
+    public Page<MovieResponse> searchByKeyword(String keyword, Pageable pageable) {
+        return movieRepository.searchByKeyword(keyword, pageable)
+                .map(this::convertToResponse);
+    }
+
+    public List<Map<String, Object>> getMovieStatusStatistics() {
+        return movieRepository.getMovieStatusStatistics();
+    }
+
+    public List<Map<String, Object>> getMovieCategoryStatistics() {
+        return movieRepository.getMovieCategoryStatistics();
     }
 
     private MovieResponse convertToResponse(Movie movie) {
