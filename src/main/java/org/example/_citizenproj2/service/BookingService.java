@@ -2,21 +2,26 @@ package org.example._citizenproj2.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.BookingRequest;
+import org.example._citizenproj2.dto.request.GroupBookingRequest;
 import org.example._citizenproj2.dto.response.BookingResponse;
 import org.example._citizenproj2.exception.BookingException;
 import org.example._citizenproj2.exception.SeatNotAvailableException;
 import org.example._citizenproj2.model.*;
 import org.example._citizenproj2.repository.*;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class BookingService {
 
     private final BookingRepository bookingRepository;
@@ -36,7 +41,7 @@ public class BookingService {
                 .orElseThrow(() -> new BookingException("會員不存在"));
 
         // 驗證座位
-        List<Seat> seats = validateAndGetSeats(request.getSeatIds(), showing.getVenueId());
+        List<Seat> seats = validateAndGetSeats(request.getSeatIds(), showing.getVenue().getVenueId());
 
         // 計算總金額
         BigDecimal totalAmount = calculateTotalAmount(showing, request.getTicketTypes());
@@ -48,10 +53,13 @@ public class BookingService {
 
         // 創建訂單
         Booking booking = new Booking();
+        booking.setBookingId(generateBookingId());
         booking.setMember(member);
         booking.setShowing(showing);
         booking.setTotalAmount(totalAmount);
         booking.setBookingStatus(Booking.BookingStatus.PENDING);
+        booking.setPaymentStatus(Booking.PaymentStatus.UNPAID);
+        booking.setBookingTime(LocalDateTime.now());
 
         // 保存訂單
         booking = bookingRepository.save(booking);
@@ -60,27 +68,40 @@ public class BookingService {
         createBookingDetails(booking, seats, request.getTicketTypes());
 
         // 更新座位狀態
-        updateShowingAvailableSeats(showing.getShowingId());
+        updateShowingAvailableSeats(showing);
 
         // 扣除錢包餘額
         walletService.processPayment(member.getMemberId(), totalAmount, booking.getBookingId());
+        booking.setPaymentStatus(Booking.PaymentStatus.PAID);
+        booking = bookingRepository.save(booking);
 
         return convertToBookingResponse(booking);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public BookingResponse createGroupBooking(GroupBookingRequest request) {
+        Showing showing = showingRepository.findById(request.getShowingId())
+                .orElseThrow(() -> new BookingException("場次不存在"));
+
+        if (request.getMinMembers() > request.getMaxMembers()) {
+            throw new BookingException("最小人數不能大於最大人數");
+        }
+
+        // 創建團體訂單邏輯
+        // ... 實作團體訂單相關邏輯
+
+        return null; // 需要實作完整的團體訂票邏輯
+    }
+
     public BookingResponse getBookingById(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException("訂單不存在"));
         return convertToBookingResponse(booking);
     }
 
-    @Transactional(readOnly = true)
-    public List<BookingResponse> getMemberBookings(Long memberId, int page, int size) {
+    public Page<BookingResponse> getMemberBookings(Long memberId, int page, int size) {
         return bookingRepository.findByMemberMemberId(memberId, PageRequest.of(page, size))
-                .stream()
-                .map(this::convertToBookingResponse)
-                .toList();
+                .map(this::convertToBookingResponse);
     }
 
     @Transactional
@@ -97,28 +118,57 @@ public class BookingService {
         booking = bookingRepository.save(booking);
 
         // 退回座位
-        updateShowingAvailableSeats(booking.getShowing().getShowingId());
+        updateShowingAvailableSeats(booking.getShowing());
 
         // 退款處理
         if (booking.getPaymentStatus() == Booking.PaymentStatus.PAID) {
-            walletService.processRefund(booking.getMember().getMemberId(),
+            walletService.processRefund(
+                    booking.getMember().getMemberId(),
                     booking.getTotalAmount(),
-                    booking.getBookingId());
+                    booking.getBookingId()
+            );
         }
 
         return convertToBookingResponse(booking);
     }
 
-    @Transactional(readOnly = true)
     public List<String> getAvailableSeats(Long showingId) {
+        Showing showing = showingRepository.findById(showingId)
+                .orElseThrow(() -> new BookingException("場次不存在"));
         List<Long> bookedSeatIds = bookingRepository.findBookedSeatIds(showingId);
-        return seatRepository.findAvailableSeats(showingId, bookedSeatIds);
+        // 修改這裡，直接使用 Repository 的方法返回座位號碼列表
+        return seatRepository.findAvailableSeatNumbers(
+                showing.getVenue().getVenueId(),
+                bookedSeatIds
+        );
     }
 
-    @Transactional(readOnly = true)
     public boolean verifySeatsAvailability(Long showingId, List<Long> seatIds) {
         List<Long> bookedSeatIds = bookingRepository.findBookedSeatIds(showingId);
         return !bookedSeatIds.containsAll(seatIds);
+    }
+
+    @Transactional
+    public BookingResponse updatePaymentStatus(String bookingId, String status) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("訂單不存在"));
+
+        booking.setPaymentStatus(Booking.PaymentStatus.valueOf(status.toUpperCase()));
+        return convertToBookingResponse(bookingRepository.save(booking));
+    }
+
+    public Map<String, Object> getBookingStatistics(String startDate, String endDate) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDateTime start = LocalDate.parse(startDate, formatter).atStartOfDay();
+        LocalDateTime end = LocalDate.parse(endDate, formatter).atTime(23, 59, 59);
+
+        // 獲取統計數據列表
+        List<Map<String, Object>> statisticsList = bookingRepository.getBookingStatistics(start, end);
+
+        // 將列表中的第一個元素作為結果返回，如果列表為空則返回空的Map
+        return statisticsList.isEmpty() ?
+                new HashMap<>() :
+                statisticsList.get(0);
     }
 
     private List<Seat> validateAndGetSeats(List<Long> seatIds, Long venueId) {
@@ -129,7 +179,7 @@ public class BookingService {
         }
 
         seats.forEach(seat -> {
-            if (!seat.getVenueId().equals(venueId)) {
+            if (!seat.getVenue().getVenueId().equals(venueId)) {
                 throw new SeatNotAvailableException("座位不屬於該影廳");
             }
             if (seat.getStatus() != Seat.Status.ACTIVE) {
@@ -140,21 +190,31 @@ public class BookingService {
         return seats;
     }
 
+    private String generateBookingId() {
+        return "BK" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
     private BigDecimal calculateTotalAmount(Showing showing, List<String> ticketTypes) {
-        // 實作票價計算邏輯
         return showing.getBasePrice().multiply(BigDecimal.valueOf(ticketTypes.size()));
     }
 
     private void createBookingDetails(Booking booking, List<Seat> seats, List<String> ticketTypes) {
-        // 實作訂單明細創建邏輯
+        for (int i = 0; i < seats.size(); i++) {
+            BookingDetail detail = new BookingDetail();
+            detail.setBooking(booking);
+            detail.setSeat(seats.get(i));
+            detail.setTicketType(BookingDetail.TicketType.valueOf(ticketTypes.get(i)));
+            // 需要實作 BookingDetailRepository 來保存明細
+        }
     }
 
-    private void updateShowingAvailableSeats(Long showingId) {
-        // 實作座位數更新邏輯
+    private void updateShowingAvailableSeats(Showing showing) {
+        int bookedSeats = bookingRepository.countConfirmedBookings(showing.getShowingId()).intValue();
+        showing.setAvailableSeats(showing.getVenue().getTotalCapacity() - bookedSeats);
+        showingRepository.save(showing);
     }
 
     private BookingResponse convertToBookingResponse(Booking booking) {
-        // 實作轉換邏輯
         return BookingResponse.builder()
                 .bookingId(booking.getBookingId())
                 .memberId(booking.getMember().getMemberId())

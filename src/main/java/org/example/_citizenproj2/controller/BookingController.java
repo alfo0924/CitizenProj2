@@ -40,7 +40,7 @@ public class BookingController {
             @PathVariable Long memberId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(bookingService.getMemberBookings(memberId, page, size));
+        return ResponseEntity.ok((List<BookingResponse>) bookingService.getMemberBookings(memberId, page, size));
     }
 
     @PutMapping("/{bookingId}/cancel")

@@ -3,6 +3,7 @@ package org.example._citizenproj2.service;
 import lombok.RequiredArgsConstructor;
 import org.example._citizenproj2.dto.request.MovieRequest;
 import org.example._citizenproj2.dto.response.MovieResponse;
+import org.example._citizenproj2.dto.response.RatingResponse;
 import org.example._citizenproj2.exception.MovieNotFoundException;
 import org.example._citizenproj2.model.Movie;
 import org.example._citizenproj2.model.MovieCategory;
@@ -14,6 +15,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.stream.Collectors;
+import org.example._citizenproj2.model.Rating;
+import org.example._citizenproj2.repository.RatingRepository;
+
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,7 +33,7 @@ public class MovieService {
 
     private final MovieRepository movieRepository;
     private final MovieCategoryRepository categoryRepository;
-
+    private final RatingRepository ratingRepository;
     @Transactional
     public MovieResponse createMovie(MovieRequest request) {
         MovieCategory category = categoryRepository.findById(request.getCategoryId())
@@ -166,6 +173,80 @@ public class MovieService {
                 .categoryId(movie.getCategory().getCategoryId())
                 .categoryName(movie.getCategory().getCategoryName())
                 .movieStatus(movie.getMovieStatus())
+                .build();
+    }
+    // 在 MovieService 類中添加以下方法
+
+    public List<MovieResponse.ShowingInfo> getMovieShowings(Long movieId) {
+        Movie movie = movieRepository.findById(movieId)
+                .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + movieId + " 的電影"));
+
+        return movie.getShowings().stream()
+                .map(showing -> MovieResponse.ShowingInfo.builder()
+                        .showingId(showing.getShowingId())
+                        .showTime(showing.getShowTime())
+                        .venueName(showing.getVenue().getVenueName())
+                        .availableSeats(showing.getAvailableSeats())
+                        .basePrice(showing.getBasePrice())
+                        .status(showing.getShowingStatus().toString())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    public Page<CategoryResponse> getMovieCategories(Pageable pageable) {
+        return categoryRepository.findAll(pageable)
+                .map(category -> CategoryResponse.builder()
+                        .categoryId(category.getCategoryId())
+                        .categoryName(category.getCategoryName())
+                        .description(category.getDescription())
+                        .isActive(category.getIsActive())
+                        .displayOrder(category.getDisplayOrder())
+                        .build());
+    }
+
+    @Transactional
+    public RatingResponse addMovieRating(Long movieId, RatingRequest request) {
+        Movie movie = movieRepository.findById(movieId)
+                .orElseThrow(() -> new MovieNotFoundException("找不到ID為 " + movieId + " 的電影"));
+
+        Rating rating = new Rating();
+        rating.setMovie(movie);
+        rating.setRating(request.getRating());
+        rating.setComment(request.getComment());
+        rating.setCreatedAt(LocalDateTime.now());
+
+        Rating savedRating = ratingRepository.save(rating);
+
+        return convertToRatingResponse(savedRating);
+    }
+
+    public Page<RatingResponse> getMovieRatings(Long movieId, Pageable pageable) {
+        return ratingRepository.findByMovieMovieId(movieId, pageable)
+                .map(this::convertToRatingResponse);
+    }
+
+    public Map<String, Object> getMovieStatistics(String startDate, String endDate) {
+        LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now().minusMonths(1);
+        LocalDate end = endDate != null ? LocalDate.parse(endDate) : LocalDate.now();
+
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("statusStats", getMovieStatusStatistics());
+        statistics.put("categoryStats", getMovieCategoryStatistics());
+        statistics.put("totalMovies", movieRepository.count());
+        statistics.put("showingMovies", movieRepository.countByMovieStatus(Movie.MovieStatus.SHOWING));
+        statistics.put("upcomingMovies", movieRepository.countByMovieStatus(Movie.MovieStatus.COMING));
+
+        return statistics;
+    }
+
+    // 添加輔助方法
+    private RatingResponse convertToRatingResponse(Rating rating) {
+        return RatingResponse.builder()
+                .ratingId(rating.getRatingId())
+                .movieId(rating.getMovie().getMovieId())
+                .rating(rating.getRating())
+                .comment(rating.getComment())
+                .createdAt(rating.getCreatedAt())
                 .build();
     }
 }

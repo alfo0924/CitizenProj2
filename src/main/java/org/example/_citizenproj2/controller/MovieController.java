@@ -7,9 +7,11 @@ import org.example._citizenproj2.dto.response.MovieResponse;
 import org.example._citizenproj2.dto.response.CategoryResponse;
 import org.example._citizenproj2.dto.response.RatingResponse;
 import org.example._citizenproj2.exception.MovieNotFoundException;
+import org.example._citizenproj2.model.Movie;
 import org.example._citizenproj2.service.MovieService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,22 +45,26 @@ public class MovieController {
     public ResponseEntity<Page<MovieResponse>> getAllMovies(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Movie.MovieStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "releaseDate,desc") String sort) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sort));
-        return ResponseEntity.ok(movieService.getAllMovies(keyword, categoryId, status, pageable));
+        return ResponseEntity.ok(movieService.searchMovies(keyword, null, status, categoryId, pageable));
     }
 
     @GetMapping("/showing")
-    public ResponseEntity<List<MovieResponse>> getCurrentlyShowingMovies() {
-        return ResponseEntity.ok(movieService.getCurrentlyShowingMovies());
+    public ResponseEntity<Page<MovieResponse>> getCurrentlyShowingMovies(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(movieService.getCurrentlyShowingMovies(PageRequest.of(page, size)));
     }
 
     @GetMapping("/coming")
-    public ResponseEntity<List<MovieResponse>> getUpcomingMovies() {
-        return ResponseEntity.ok(movieService.getUpcomingMovies());
+    public ResponseEntity<Page<MovieResponse>> getUpcomingMovies(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(movieService.getUpcomingMovies(PageRequest.of(page, size)));
     }
 
     @PutMapping("/{id}")
@@ -77,15 +83,15 @@ public class MovieController {
     }
 
     @GetMapping("/{id}/showings")
-    public ResponseEntity<List<MovieResponse.ShowingInfo>> getMovieShowings(
-            @PathVariable Long id,
-            @RequestParam(required = false) String date) {
-        return ResponseEntity.ok(movieService.getMovieShowings(id, date));
+    public ResponseEntity<List<MovieResponse.ShowingInfo>> getMovieShowings(@PathVariable Long id) {
+        return ResponseEntity.ok(movieService.getMovieShowings(id));
     }
 
     @GetMapping("/categories")
-    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
-        return ResponseEntity.ok(movieService.getAllCategories());
+    public ResponseEntity<Page<CategoryResponse>> getAllCategories(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(movieService.getMovieCategories(PageRequest.of(page, size)));
     }
 
     @PostMapping("/{id}/ratings")
@@ -93,7 +99,7 @@ public class MovieController {
     public ResponseEntity<RatingResponse> rateMovie(
             @PathVariable Long id,
             @Valid @RequestBody RatingRequest request) {
-        return ResponseEntity.ok(movieService.rateMovie(id, request));
+        return ResponseEntity.ok(movieService.addMovieRating(id, request));
     }
 
     @GetMapping("/{id}/ratings")
@@ -106,27 +112,28 @@ public class MovieController {
 
     @GetMapping("/search")
     public ResponseEntity<Page<MovieResponse>> searchMovies(
-            @RequestParam String query,
-            @RequestParam(required = false) List<Long> categoryIds,
-            @RequestParam(required = false) List<String> statuses,
+            @RequestParam String keyword,
+            @RequestParam(required = false) String director,
+            @RequestParam(required = false) Movie.MovieStatus status,
+            @RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "releaseDate,desc") String sort) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sort));
-        return ResponseEntity.ok(movieService.searchMovies(query, categoryIds, statuses, pageable));
+        return ResponseEntity.ok(movieService.searchMovies(keyword, director, status, categoryId, pageable));
     }
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MovieResponse> updateMovieStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
+            @RequestParam Movie.MovieStatus status) {
         return ResponseEntity.ok(movieService.updateMovieStatus(id, status));
     }
 
     @GetMapping("/statistics")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> getMovieStatistics(
+    public ResponseEntity<Map<String, Object>> getStatistics(
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         return ResponseEntity.ok(movieService.getMovieStatistics(startDate, endDate));

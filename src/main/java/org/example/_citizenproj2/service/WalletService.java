@@ -167,13 +167,17 @@ public class WalletService {
             throw new WalletException("錢包狀態不可用");
         }
     }
-
     private void validateBalance(Wallet wallet, BigDecimal amount) {
         if (wallet.getBalance().compareTo(amount) < 0) {
-            throw new InsufficientBalanceException(wallet.getBalance(), amount);
+            throw new InsufficientBalanceException(
+                    String.format("餘額不足。當前餘額: %s, 需要金額: %s",
+                            wallet.getBalance().toString(),
+                            amount.toString()),
+                    wallet.getBalance(),
+                    amount
+            );
         }
     }
-
     private void validateDepositAmount(BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new WalletException("存款金額必須大於0");
