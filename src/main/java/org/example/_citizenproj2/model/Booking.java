@@ -185,4 +185,8 @@ public class Booking {
             bookingDetails = new ArrayList<>();
         }
     }
+    public boolean isValid() {
+        return bookingStatus == BookingStatus.CONFIRMED ||
+                bookingStatus == BookingStatus.PENDING;
+    }
 }

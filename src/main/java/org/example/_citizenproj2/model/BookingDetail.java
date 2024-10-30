@@ -1,5 +1,6 @@
 package org.example._citizenproj2.model;
 
+import ch.qos.logback.classic.Level;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -9,12 +10,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "booking_details")
-@Data  // 已有，但確保存在
-@Getter // 明確添加
-@Setter // 明確添加
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingDetail {
+    public static Level tickettype;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bookingDetailId;
@@ -29,7 +30,7 @@ public class BookingDetail {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private tickettype ticketType = tickettype.ADULT;
+    private TicketType ticketType = TicketType.ADULT;
 
     @Column(nullable = false)
     private BigDecimal ticketPrice;
@@ -38,18 +39,6 @@ public class BookingDetail {
     private LocalDateTime createdAt;
 
     public enum TicketType {
-        ADULT,
-        CHILD,
-        SENIOR,
-        STUDENT
-    }
-
-
-
-
-
-    @Getter
-    public enum tickettype {
         ADULT(new BigDecimal("1.0"), "全票"),
         CHILD(new BigDecimal("0.5"), "兒童票"),
         SENIOR(new BigDecimal("0.7"), "敬老票"),
@@ -58,14 +47,21 @@ public class BookingDetail {
         private final BigDecimal priceMultiplier;
         private final String displayName;
 
-        tickettype(BigDecimal priceMultiplier, String displayName) {
+        TicketType(BigDecimal priceMultiplier, String displayName) {
             this.priceMultiplier = priceMultiplier;
             this.displayName = displayName;
         }
 
+        public BigDecimal getPriceMultiplier() {
+            return priceMultiplier;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
     }
 
-    // 修改計算票價的方法
+    // 計算票價的方法
     public void calculateTicketPrice() {
         // 基本票價
         BigDecimal basePrice = booking.getShowing().getBasePrice();
@@ -79,66 +75,59 @@ public class BookingDetail {
         }
     }
 
-    // 新增驗證方法
-    public boolean isValidTicketType() {
-        // 檢查特定票種的限制
-        switch (ticketType) {
-            case CHILD:
-                return booking.getMember().isChildTicketEligible();
-            case SENIOR:
-                return booking.getMember().isSeniorTicketEligible();
-            case STUDENT:
-                return booking.getMember().isStudentTicketEligible();
-            default:
-                return true;
-        }
+    // 驗證座位是否可用
+    public boolean validateSeat() {
+        return seat.isAvailable() && !isAlreadyBooked();
     }
 
-    // 新增取得票價描述的方法
-    public String getTicketDescription() {
-        StringBuilder description = new StringBuilder();
-        description.append(ticketType.getDisplayName());
-
-        if (seat.getSeatType() == Seat.SeatType.VIP) {
-            description.append(" (VIP座位)");
+    // 驗證票種是否適用
+    public boolean validateTicketType() {
+        if (booking == null || booking.getMember() == null) {
+            return false;
         }
 
-        description.append(String.format(" - NT$%s", ticketPrice));
-        return description.toString();
+        Member member = booking.getMember();
+        return switch (ticketType) {
+            case CHILD -> member.isChildTicketEligible();
+            case SENIOR -> member.isSeniorTicketEligible();
+            case STUDENT -> member.isStudentTicketEligible();
+            default -> true;
+        };
     }
 
-    // 新增預處理方法
+    private boolean isAlreadyBooked() {
+        if (booking == null || booking.getShowing() == null) {
+            return false;
+        }
+
+        return booking.getShowing().getBookings().stream()
+                .filter(b -> b.getBookingStatus() != Booking.BookingStatus.CANCELLED)
+                .flatMap(b -> b.getBookingDetails().stream())
+                .anyMatch(detail -> detail.getSeat().equals(this.seat));
+    }
+
+    // 預處理方法
     @PrePersist
     public void prePersist() {
         if (ticketType == null) {
-            ticketType = tickettype.ADULT;
+            ticketType = TicketType.ADULT;
         }
         calculateTicketPrice();
     }
 
-    // 新增座位驗證方法
-    public boolean validateSeat() {
-        if (!seat.isAvailable()) {
-            return false;
+    // 取得票價描述
+    public String getTicketDescription() {
+        StringBuilder description = new StringBuilder();
+        description.append(ticketType.getDisplayName());
+
+        if (seat != null && seat.getSeatType() == Seat.SeatType.VIP) {
+            description.append(" (VIP座位)");
         }
 
-        if (isAlreadyBooked()) {
-            return false;
+        if (ticketPrice != null) {
+            description.append(String.format(" - NT$%s", ticketPrice));
         }
 
-        // 檢查VIP座位限制
-        if (seat.getSeatType() == Seat.SeatType.VIP &&
-                !booking.getMember().isVipSeatEligible()) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private boolean isAlreadyBooked() {
-        return booking.getShowing().getBookings().stream()
-                .flatMap(b -> b.getBookingDetails().stream())
-                .anyMatch(detail -> detail.getSeat().equals(seat) &&
-                        !detail.getBooking().isCancelled());
+        return description.toString();
     }
 }

@@ -35,7 +35,7 @@ public class WalletService {
     private final TransactionRepository transactionRepository;
 
     @Transactional
-    public WalletResponse createWallet(Long memberId) {
+    public void createWallet(Long memberId) {
         if (walletRepository.existsByMemberMemberId(memberId)) {
             throw new WalletException("錢包已存在");
         }
@@ -47,11 +47,11 @@ public class WalletService {
         wallet.setTotalSpent(BigDecimal.ZERO);
         wallet.setWalletStatus(Wallet.WalletStatus.ACTIVE);
 
-        return convertToWalletResponse(walletRepository.save(wallet));
+        convertToWalletResponse(walletRepository.save(wallet));
     }
 
     public WalletResponse getWalletByMemberId(Long memberId) {
-        Wallet wallet = walletRepository.findByMemberMemberId(memberId)
+        Wallet wallet = (Wallet) walletRepository.findByMemberMemberId(memberId)
                 .orElseThrow(() -> new WalletException("錢包不存在"));
         return convertToWalletResponse(wallet);
     }
@@ -99,8 +99,8 @@ public class WalletService {
     }
 
     @Transactional
-    public TransactionResponse processPayment(Long memberId, BigDecimal amount, String referenceId) {
-        Wallet wallet = walletRepository.findByMemberMemberId(memberId)
+    public void processPayment(Long memberId, BigDecimal amount, String referenceId) {
+        Wallet wallet = (Wallet) walletRepository.findByMemberMemberId(memberId)
                 .orElseThrow(() -> new WalletException("錢包不存在"));
 
         validateWalletStatus(wallet);
@@ -119,12 +119,12 @@ public class WalletService {
         wallet.setLastTransactionTime(LocalDateTime.now());
         walletRepository.save(wallet);
 
-        return convertToTransactionResponse(transactionRepository.save(transaction));
+        convertToTransactionResponse(transactionRepository.save(transaction));
     }
 
     @Transactional
     public TransactionResponse processRefund(Long memberId, BigDecimal amount, String referenceId) {
-        Wallet wallet = walletRepository.findByMemberMemberId(memberId)
+        Wallet wallet = (Wallet) walletRepository.findByMemberMemberId(memberId)
                 .orElseThrow(() -> new WalletException("錢包不存在"));
 
         Transaction transaction = createTransaction(
@@ -152,7 +152,8 @@ public class WalletService {
     }
 
     public boolean hasEnoughBalance(Long memberId, BigDecimal amount) {
-        return walletRepository.findByMemberMemberId(memberId)
+        return walletRepository.findByMember_MemberId(memberId)
+                .filter(wallet -> wallet.getWalletStatus() == Wallet.WalletStatus.ACTIVE)
                 .map(wallet -> wallet.getBalance().compareTo(amount) >= 0)
                 .orElse(false);
     }
@@ -249,7 +250,7 @@ public class WalletService {
     @Transactional
     public TransactionResponse transfer(Long walletId, TransferRequest request) {
         Wallet senderWallet = getWalletById(walletId);
-        Wallet receiverWallet = walletRepository.findByMemberMemberId(request.getReceiverMemberId())
+        Wallet receiverWallet = (Wallet) walletRepository.findByMemberMemberId(request.getReceiverMemberId())
                 .orElseThrow(() -> new WalletException("收款方錢包不存在"));
 
         validateWalletStatus(senderWallet);

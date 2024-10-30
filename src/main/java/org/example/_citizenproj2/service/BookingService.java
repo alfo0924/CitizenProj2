@@ -203,7 +203,7 @@ public class BookingService {
             BookingDetail detail = new BookingDetail();
             detail.setBooking(booking);
             detail.setSeat(seats.get(i));
-            detail.setTicketType(BookingDetail.tickettype.valueOf(ticketTypes.get(i)));
+            detail.setTicketType(BookingDetail.TicketType.valueOf(ticketTypes.get(i)));
             // 需要實作 BookingDetailRepository 來保存明細
         }
     }

@@ -212,4 +212,16 @@ public class Member {
     public boolean isVipSeatEligible() {
         return isVipMember;
     }
+
+    @Column(name = "disability_card_number")
+    private String disabilityCardNumber;
+
+    // 添加公共訪問方法
+    public boolean isVipMember() {
+        return Boolean.TRUE.equals(this.isVipMember);
+    }
+
+    public boolean isDisabilityCardHolder() {
+        return disabilityCardNumber != null && !disabilityCardNumber.isEmpty();
+    }
 }

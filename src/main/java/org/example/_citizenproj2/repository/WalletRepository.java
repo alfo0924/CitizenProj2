@@ -18,21 +18,18 @@ import java.util.Optional;
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, Long> {
 
-    Optional<Wallet> findByMemberId(Long memberId);
+    // 基本查詢方法
+    @Query("SELECT w FROM Wallet w WHERE w.member.memberId = :memberId")
+    Optional<Wallet> findByMember_MemberId(@Param("memberId") Long memberId);
 
-    boolean existsByMemberId(Long memberId);
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM Wallet w WHERE w.member.memberId = :memberId")
+    boolean existsByMember_MemberId(@Param("memberId") Long memberId);
 
-    List<Wallet> findByWalletStatus(Wallet.WalletStatus status);
-
-    @Query("SELECT w FROM Wallet w WHERE w.member.id = :memberId")
-    Optional<Wallet> findByMemberMemberId(@Param("memberId") Long memberId);
-
-    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM Wallet w WHERE w.member.id = :memberId")
-    boolean existsByMemberMemberId(@Param("memberId") Long memberId);
-
+    // 餘額查詢
     @Query("SELECT w.balance FROM Wallet w WHERE w.walletId = :walletId")
     Optional<BigDecimal> findBalanceById(@Param("walletId") Long walletId);
 
+    // 交易統計
     @Query("SELECT new map(" +
             "t.transactionType as type, " +
             "COUNT(t) as count, " +
@@ -43,25 +40,29 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
             "GROUP BY t.transactionType")
     List<Map<String, Object>> getTransactionStatistics(@Param("walletId") Long walletId);
 
+    // 活躍錢包查詢
     @Query("SELECT w FROM Wallet w " +
             "WHERE w.lastTransactionTime >= :since " +
             "AND w.walletStatus = 'ACTIVE'")
     List<Wallet> findActiveWallets(@Param("since") LocalDateTime since);
 
+    // 餘額檢查
     @Query("SELECT CASE WHEN w.balance >= :amount THEN true ELSE false END " +
             "FROM Wallet w WHERE w.walletId = :walletId")
     boolean hasEnoughBalance(@Param("walletId") Long walletId,
                              @Param("amount") BigDecimal amount);
 
+    // 錢包統計
     @Query("SELECT new map(" +
-            "w.member.id as memberId, " +
+            "w.member.memberId as memberId, " +
             "SUM(CASE WHEN t.transactionType = 'DEPOSIT' THEN t.amount ELSE 0 END) as totalDeposit, " +
             "SUM(CASE WHEN t.transactionType = 'WITHDRAWAL' THEN t.amount ELSE 0 END) as totalWithdrawal) " +
             "FROM Wallet w LEFT JOIN w.transactions t " +
             "WHERE w.walletId = :walletId " +
-            "GROUP BY w.member.id")
+            "GROUP BY w.member.memberId")
     Map<String, Object> getWalletStatistics(@Param("walletId") Long walletId);
 
+    // 交易歷史查詢
     @Query("SELECT t FROM Transaction t " +
             "WHERE t.wallet.walletId = :walletId " +
             "AND t.transactionTime BETWEEN :startTime AND :endTime " +
@@ -71,4 +72,8 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             Pageable pageable);
+
+    boolean existsByMemberMemberId(Long memberId);
+
+    Optional<Object> findByMemberMemberId(Long memberId);
 }
